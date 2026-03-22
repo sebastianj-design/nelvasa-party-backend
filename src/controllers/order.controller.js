@@ -9,7 +9,7 @@ const Cart = require("../models/Cart");
 
 exports.checkoutOrder = async (req, res) => {
   try {
-    const { paymentMethod, address, items, total } = req.body;
+    const { paymentMethod, address, items, total, deliveryDate } = req.body;
 
     let orderItems = [];
     let totalAmount = 0;
@@ -98,8 +98,8 @@ exports.checkoutOrder = async (req, res) => {
       orderType: "online",
       items: orderItems,
       totalAmount,
-      paymentMethod: paymentMethod || "efectivo",
-      address: address || "N/A",
+      paymentMethod,
+      address,
       status: "pendiente"
     });
 
