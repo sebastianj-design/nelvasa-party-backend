@@ -9,67 +9,110 @@ const Cart = require("../models/Cart");
 
 exports.checkoutOrder = async (req, res) => {
   try {
-    const { paymentMethod, address } = req.body;
+    const { paymentMethod, address, items, total } = req.body;
 
-    const cart = await Cart.findOne({ user: req.user.id })
-      .populate("items.product");
-
-    if (!cart || cart.items.length === 0) {
-      return res.status(400).json({ message: "El carrito está vacío" });
-    }
-
+    let orderItems = [];
     let totalAmount = 0;
-    const orderItems = [];
 
-    for (let item of cart.items) {
-      const product = item.product;
+    // ======================================================
+    // 🔥 CASO 1: VIENE DESDE APP MÓVIL
+    // ======================================================
+    if (items && items.length > 0) {
 
-      if (!product || !product.isActive) {
-        return res.status(400).json({ message: "Producto no disponible" });
-      }
+      for (let item of items) {
+        const product = await Product.findById(item.product);
 
-      if (product.stock < item.quantity) {
-        return res.status(400).json({
-          message: `Stock insuficiente para ${product.name}`
+        if (!product || !product.isActive) {
+          return res.status(400).json({ message: "Producto no disponible" });
+        }
+
+        if (product.stock < item.quantity) {
+          return res.status(400).json({
+            message: `Stock insuficiente para ${product.name}`
+          });
+        }
+
+        // 🔥 Restar stock
+        product.stock -= item.quantity;
+        await product.save();
+
+        totalAmount += product.price * item.quantity;
+
+        orderItems.push({
+          product: product._id,
+          name: product.name,
+          price: product.price,
+          quantity: item.quantity
         });
       }
 
-      // 🔥 Restar stock
-      product.stock -= item.quantity;
-      await product.save();
+    } else {
 
-      totalAmount += product.price * item.quantity;
+      // ======================================================
+      // 🧠 CASO 2: USAR CARRITO DB (WEB)
+      // ======================================================
+      const cart = await Cart.findOne({ user: req.user.id })
+        .populate("items.product");
 
-      orderItems.push({
-        product: product._id,
-        name: product.name,
-        price: product.price,
-        quantity: item.quantity
-      });
+      if (!cart || cart.items.length === 0) {
+        return res.status(400).json({ message: "El carrito está vacío" });
+      }
+
+      for (let item of cart.items) {
+        const product = item.product;
+
+        if (!product || !product.isActive) {
+          return res.status(400).json({ message: "Producto no disponible" });
+        }
+
+        if (product.stock < item.quantity) {
+          return res.status(400).json({
+            message: `Stock insuficiente para ${product.name}`
+          });
+        }
+
+        product.stock -= item.quantity;
+        await product.save();
+
+        totalAmount += product.price * item.quantity;
+
+        orderItems.push({
+          product: product._id,
+          name: product.name,
+          price: product.price,
+          quantity: item.quantity
+        });
+      }
+
+      // 🔥 Vaciar carrito solo si viene de DB
+      cart.items = [];
+      await cart.save();
     }
 
+    // ======================================================
+    // 🧾 CREAR PEDIDO
+    // ======================================================
     const order = await Order.create({
       user: req.user.id,
       createdBy: req.user.id,
       orderType: "online",
       items: orderItems,
       totalAmount,
-      paymentMethod,
-      address,
+      paymentMethod: paymentMethod || "efectivo",
+      address: address || "N/A",
       status: "pendiente"
     });
 
-    // 🔥 Vaciar carrito
-    cart.items = [];
-    await cart.save();
-
-    res.status(201).json(order);
+    res.status(201).json({
+      message: "Pedido creado correctamente",
+      order
+    });
 
   } catch (error) {
+    console.log("❌ ERROR CHECKOUT:", error);
     res.status(500).json({ message: error.message });
   }
 };
-
 
 // ======================================================
 // 🏪 2️⃣ CREAR PEDIDO EN TIENDA (POS)
