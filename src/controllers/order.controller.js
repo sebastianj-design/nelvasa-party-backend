@@ -100,6 +100,7 @@ exports.checkoutOrder = async (req, res) => {
       totalAmount,
       paymentMethod,
       address,
+      deliveryDate,
       status: "pendiente"
     });
 
