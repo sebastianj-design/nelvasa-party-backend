@@ -15,6 +15,7 @@ connectDB();
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/orders", orderRoutes);
+app.use("/api/suppliers", supplierRoutes);
 
 // Levantar servidor
 app.listen(PORT, () => {

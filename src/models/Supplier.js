@@ -10,7 +10,7 @@ const supplierSchema = new mongoose.Schema(
     phone: String,
     email: String,
     address: String,
-    // taxId: String
+    
   },
   { timestamps: true }
 );
