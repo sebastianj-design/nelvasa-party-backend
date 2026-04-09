@@ -9,16 +9,34 @@ const Cart = require("../models/Cart");
 
 exports.checkoutOrder = async (req, res) => {
   try {
-    const { paymentMethod, address, items, total, deliveryDate } = req.body;
+    const {
+      paymentMethod,
+      address,
+      items,
+      total,
+      deliveryDate,
+      customerName,
+      phone,
+      customerEmail,
+      deliveryInstructions
+    } = req.body;
+
+    // ======================================================
+    // ✅ VALIDACIONES DE CAMPOS OBLIGATORIOS PARA DELIVERY
+    // ======================================================
+    if (!customerName || !phone || !address || !deliveryDate) {
+      return res.status(400).json({
+        message: "Faltan datos del cliente o dirección de entrega"
+      });
+    }
 
     let orderItems = [];
     let totalAmount = 0;
 
     // ======================================================
-    // 🔥 CASO 1: VIENE DESDE APP MÓVIL
+    // 🔥 CASO 1: VIENE DESDE APP MÓVIL (items ya calculados)
     // ======================================================
     if (items && items.length > 0) {
-
       for (let item of items) {
         const product = await Product.findById(item.product);
 
@@ -32,7 +50,6 @@ exports.checkoutOrder = async (req, res) => {
           });
         }
 
-        // 🔥 Restar stock
         product.stock -= item.quantity;
         await product.save();
 
@@ -45,13 +62,11 @@ exports.checkoutOrder = async (req, res) => {
           quantity: item.quantity
         });
       }
-
     } else {
-
       // ======================================================
-      // 🧠 CASO 2: USAR CARRITO DB (WEB)
+      // 🧠 CASO 2: USAR CARRITO DB (WEB) - si decides mantenerlo
       // ======================================================
-      const cart = await Cart.findOne({ user: req.user.id })
+      const cart = await Cart.findOne({ user: req.user?.id })
         .populate("items.product");
 
       if (!cart || cart.items.length === 0) {
@@ -84,23 +99,26 @@ exports.checkoutOrder = async (req, res) => {
         });
       }
 
-      // 🔥 Vaciar carrito solo si viene de DB
       cart.items = [];
       await cart.save();
     }
 
     // ======================================================
-    // 🧾 CREAR PEDIDO
+    // 🧾 CREAR PEDIDO CON LOS NUEVOS CAMPOS
     // ======================================================
     const order = await Order.create({
-      user: req.user.id,
-      createdBy: req.user.id,
+      user: req.user?._id || null,        // invitado si no hay usuario
+      createdBy: req.user?._id || null,
       orderType: "online",
       items: orderItems,
       totalAmount,
       paymentMethod,
       address,
       deliveryDate,
+      customerName,
+      phone,
+      customerEmail: customerEmail || "",
+      deliveryInstructions: deliveryInstructions || "",
       status: "pendiente"
     });
 
